@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/FIAP.NotificationsAPI.Domain/FIAP.NotificationsAPI.Domain.csproj" />
+  <Project Path="src/FIAP.NotificationsAPI.Application/FIAP.NotificationsAPI.Application.csproj" />
+  <Project Path="src/FIAP.NotificationsAPI.Infrastructure/FIAP.NotificationsAPI.Infrastructure.csproj" />
+  <Project Path="src/FIAP.NotificationsAPI.Api/FIAP.NotificationsAPI.Api.csproj" />
+  <Project Path="src/FIAP.NotificationsAPI.Tests/FIAP.NotificationsAPI.Tests.csproj" />
+</Solution>
