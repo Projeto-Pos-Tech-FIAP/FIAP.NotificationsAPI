@@ -1,1 +1,1 @@
-# FIAP.NotificacoesAPI
+# FIAP.NotificationsAPI
