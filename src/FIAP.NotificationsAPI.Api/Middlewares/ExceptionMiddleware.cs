@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Net;
-using FIAP.NotificationsAPI.Application.DTOs.Shared;
+using FIAP.NotificationsAPI.Application.DTOs.Responses;
 using FIAP.NotificationsAPI.Domain.Exceptions;
 
 namespace FIAP.NotificationsAPI.Api.Middlewares;
@@ -44,9 +44,7 @@ public class ExceptionMiddleware
     {
         return ex switch
         {
-            ExternalServiceException external => (HttpStatusCode.BadGateway, CreateExceptionDto(external, HttpStatusCode.BadGateway)),
-            UnauthorizedException unauthorized => (HttpStatusCode.Unauthorized, CreateExceptionDto(unauthorized, HttpStatusCode.Unauthorized)),
-            NotFoundException notFound => (HttpStatusCode.NotFound, CreateExceptionDto(notFound, HttpStatusCode.NotFound)),
+            DomainException domain => (HttpStatusCode.BadRequest, CreateExceptionDto(domain, HttpStatusCode.BadRequest)),
             OperationCanceledException canceled => (HttpStatusCode.BadRequest, CreateExceptionDto(canceled, HttpStatusCode.BadRequest)),
             ArgumentException argument => (HttpStatusCode.BadRequest, CreateExceptionDto(argument, HttpStatusCode.BadRequest)),
             HttpRequestException httpRequest => MapHttpRequestException(httpRequest),

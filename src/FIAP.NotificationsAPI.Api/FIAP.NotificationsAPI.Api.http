@@ -1,6 +1,28 @@
 @FIAP.NotificationsAPI.Api_HostAddress = http://localhost:5221
 
-GET {{FIAP.NotificationsAPI.Api_HostAddress}}/weatherforecast/
+GET {{FIAP.NotificationsAPI.Api_HostAddress}}/health
 Accept: application/json
 
 ###
+
+POST {{FIAP.NotificationsAPI.Api_HostAddress}}/api/notifications/welcome
+Content-Type: application/json
+
+{
+  "email": "player@fiap.com.br",
+  "name": "Player One"
+}
+
+###
+
+POST {{FIAP.NotificationsAPI.Api_HostAddress}}/api/notifications/payment-processed
+Content-Type: application/json
+
+{
+  "email": "player@fiap.com.br",
+  "name": "Player One",
+  "orderId": 123,
+  "paymentAmount": 99.90,
+  "paymentDate": "2026-06-13T00:00:00",
+  "status": "Approved"
+}

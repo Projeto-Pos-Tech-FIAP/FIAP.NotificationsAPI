@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace FIAP.NotificationsAPI.Application.DTOs.Shared;
+namespace FIAP.NotificationsAPI.Application.DTOs.Responses;
 
 public class ExceptionOutputDto
 {

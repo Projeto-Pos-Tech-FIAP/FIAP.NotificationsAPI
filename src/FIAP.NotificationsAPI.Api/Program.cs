@@ -1,21 +1,18 @@
 using FIAP.NotificationsAPI.Api.Middlewares;
-using FIAP.NotificationsAPI.Infrastructure.Extensions;
+using FIAP.NotificationsAPI.Application.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
+builder.Services.AddApplication();
 
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionMiddleware>();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -27,5 +24,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();

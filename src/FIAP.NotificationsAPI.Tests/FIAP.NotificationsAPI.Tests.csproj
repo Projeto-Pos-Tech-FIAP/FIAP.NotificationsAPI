@@ -23,8 +23,6 @@
   <ItemGroup>
     <ProjectReference Include="..\FIAP.NotificationsAPI.Domain\FIAP.NotificationsAPI.Domain.csproj" />
     <ProjectReference Include="..\FIAP.NotificationsAPI.Application\FIAP.NotificationsAPI.Application.csproj" />
-    <ProjectReference Include="..\FIAP.NotificationsAPI.Infrastructure\FIAP.NotificationsAPI.Infrastructure.csproj" />
-    <ProjectReference Include="..\FIAP.NotificationsAPI.Api\FIAP.NotificationsAPI.Api.csproj" />
   </ItemGroup>
 
 </Project>

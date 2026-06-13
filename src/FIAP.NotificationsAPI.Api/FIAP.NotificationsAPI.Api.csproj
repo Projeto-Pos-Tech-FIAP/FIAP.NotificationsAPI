@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Extentions\" />
     <Folder Include="Middlewares\" />
   </ItemGroup>
 
