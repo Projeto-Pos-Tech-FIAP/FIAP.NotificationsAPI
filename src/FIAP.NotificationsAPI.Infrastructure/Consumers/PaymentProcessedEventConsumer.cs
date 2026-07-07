@@ -5,6 +5,7 @@ using FIAP.NotificationsAPI.Domain.Events;
 using FIAP.NotificationsAPI.Infrastructure.Settings;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace FIAP.NotificationsAPI.Infrastructure.Consumers
@@ -18,14 +19,14 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
         public PaymentProcessedEventConsumer(
             ILogger<PaymentProcessedEventConsumer> logger,
             INotificationService notificationService,
-            KafkaSettings kafkaSettings)
+            IOptions<KafkaSettings> kafkaOptions)
         {
             _logger = logger;
             _notificationService = notificationService;
-            _kafkaSettings = kafkaSettings;
+            _kafkaSettings = kafkaOptions.Value;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var config = new ConsumerConfig
             {
@@ -44,7 +45,7 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
             {
                 try
                 {
-                    var result = consumer.Consume(stoppingToken);
+                    var result = await Task.Run(() => consumer.Consume(stoppingToken), stoppingToken);
 
                     var paymentProcessedEvent = JsonSerializer.Deserialize<PaymentProcessedEvent>(
                         result.Message.Value,
@@ -62,8 +63,8 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
                     if (!string.Equals(paymentProcessedEvent.Status, "Approved", StringComparison.OrdinalIgnoreCase))
                     {
                         _logger.LogInformation(
-                            "Payment not approved. Notification skipped. OrderId: {OrderId}, Status: {Status}",
-                            paymentProcessedEvent.OrderId,
+                            "Payment not approved. Notification skipped. CorrelationId: {CorrelationId}, Status: {Status}",
+                            paymentProcessedEvent.CorrelationId,
                             paymentProcessedEvent.Status);
 
                         consumer.Commit(result);
@@ -72,22 +73,19 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
 
                     var request = new SendPaymentProcessedEmailRequest
                     {
-                        Email = paymentProcessedEvent.Email,
-                        Name = paymentProcessedEvent.Name,
-                        OrderId = paymentProcessedEvent.OrderId,
-                        PaymentAmount = paymentProcessedEvent.Amount,
-                        PaymentDate = paymentProcessedEvent.PaymentDate
+                        Email = $"user-{paymentProcessedEvent.UserId}@fiap.com",
+                        Name = $"User {paymentProcessedEvent.UserId}",
+                        PaymentDate = DateTime.UtcNow,
+                        Status = Domain.Enums.PaymentStatus.Approved
                     };
 
-                    _notificationService.SendPaymentProcessedEmailAsync(
-                        request,
-                        stoppingToken);
+                    await _notificationService.SendPaymentProcessedEmailAsync(request, stoppingToken);
 
                     consumer.Commit(result);
 
                     _logger.LogInformation(
-                        "PaymentProcessedEvent processed successfully. OrderId: {OrderId}",
-                        paymentProcessedEvent.OrderId);
+                        "PaymentProcessedEvent processed successfully. CorrelationId: {CorrelationId}",
+                        paymentProcessedEvent.CorrelationId);
                 }
                 catch (OperationCanceledException)
                 {
@@ -100,7 +98,6 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
                 }
             }
             consumer.Close();
-            return Task.CompletedTask;
         }
     }
 }

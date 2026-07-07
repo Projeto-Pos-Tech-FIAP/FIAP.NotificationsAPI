@@ -25,7 +25,7 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
             _logger = logger;
         }
 
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var config = new ConsumerConfig
             {
@@ -42,7 +42,7 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
             {
                 try
                 {
-                    var result = consumer.Consume(stoppingToken);
+                    var result = await Task.Run(() => consumer.Consume(stoppingToken), stoppingToken);
 
                     var userCreatedEvent = JsonSerializer.Deserialize<UserCreatedEvent>(
                         result.Message.Value,
@@ -63,9 +63,9 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
                         Name = userCreatedEvent.Name
                     };
 
-                    _sendNotificationsServices.SendWelcomeEmailAsync(request, stoppingToken);
+                    await _sendNotificationsServices.SendWelcomeEmailAsync(request, stoppingToken);
 
-                    _logger.LogWarning("UserCreatedEvent processed successfully.");
+                    _logger.LogInformation("UserCreatedEvent processed successfully.");
 
                     consumer.Commit(result);
 
@@ -81,7 +81,6 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
                 }
             }
             consumer.Close();
-            return Task.CompletedTask;
         }
     }
 }
