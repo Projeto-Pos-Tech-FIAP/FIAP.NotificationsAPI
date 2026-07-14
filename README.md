@@ -131,11 +131,9 @@ Request:
 
 ```json
 {
-  "email": "player@fiap.com.br",
-  "name": "Player One",
-  "orderId": 123,
-  "paymentAmount": 99.9,
-  "paymentDate": "2026-06-13T00:00:00",
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "gameId": 1,
+  "correlationId": "a446a667-2d23-4c22-9ea1-414deb0ea1f3",
   "status": 1
 }
 ```
@@ -167,18 +165,17 @@ Payload esperado:
 
 ### Topico `payment-processed`
 
-Quando uma mensagem valida e recebida neste topico, a API simula o envio de um e-mail de pagamento processado apenas se `status` for `Approved`.
+Quando uma mensagem valida e recebida neste topico, a API simula o envio de um e-mail de pagamento processado apenas se `status` for `Approved`. Mesmo formato de evento publicado pelo `PaymentsAPI` e consumido pelo `CatalogAPI` — um unico contrato compartilhado pelos tres servicos.
 
 Payload esperado:
 
 ```json
 {
-  "orderId": 123,
-  "name": "Player One",
-  "email": "player@fiap.com.br",
-  "amount": 99.9,
-  "paymentDate": "2026-06-13T00:00:00",
-  "status": "Approved"
+  "correlationId": "a446a667-2d23-4c22-9ea1-414deb0ea1f3",
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "gameId": 1,
+  "status": "Approved",
+  "reason": null
 }
 ```
 
@@ -187,8 +184,7 @@ Payload esperado:
 - O envio de e-mail e apenas uma simulacao feita via `Console.WriteLine`.
 - O Swagger e habilitado somente em ambiente `Development`.
 - O consumidor de pagamento ignora notificacoes quando o status do pagamento nao e `Approved`.
-- Os consumidores Kafka estao implementados no projeto `FIAP.NotificationsAPI.Infrastructure`.
-- Para ativar os consumidores Kafka na API, a camada de infraestrutura precisa ser registrada no `Program.cs` com `AddInfrastructure(builder.Configuration)`.
+- Os consumidores Kafka estao implementados no projeto `FIAP.NotificationsAPI.Infrastructure` e registrados no `Program.cs` via `AddInfrastructure(builder.Configuration)`.
 
 ## Contratos principais
 
@@ -203,11 +199,9 @@ Payload esperado:
 
 | Campo | Tipo | Obrigatorio | Validacao |
 | --- | --- | --- | --- |
-| `email` | string | Sim | Formato de e-mail |
-| `name` | string | Sim | Nao vazio |
-| `orderId` | integer | Nao | - |
-| `paymentAmount` | decimal | Sim | Minimo `0.01` |
-| `paymentDate` | datetime | Sim | Data do pagamento |
+| `userId` | guid | Sim | - |
+| `gameId` | integer | Sim | - |
+| `correlationId` | string | Nao | - |
 | `status` | integer | Nao | `1` = Approved, `2` = Rejected |
 
 ## Comandos uteis

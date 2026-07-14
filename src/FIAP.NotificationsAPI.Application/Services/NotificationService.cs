@@ -44,19 +44,16 @@ public class NotificationService : INotificationService
         Console.WriteLine("==============================================");
         Console.WriteLine("EMAIL SENDING SIMULATION");
         Console.WriteLine("==============================================");
-        Console.WriteLine($"To: {request.Email}");
+        Console.WriteLine($"To: User {request.UserId}");
         Console.WriteLine("Subject: Payment Successfully Processed - FIAP Cloud Games");
         Console.WriteLine();
-        Console.WriteLine($"Hello, {request.Name}!");
+        Console.WriteLine($"Hello, User {request.UserId}!");
         Console.WriteLine();
 
-        if (request.OrderId.HasValue)
-            Console.WriteLine($"Order ID: {request.OrderId.Value}");
+        if (!string.IsNullOrWhiteSpace(request.CorrelationId))
+            Console.WriteLine($"Order ID: {request.CorrelationId}");
 
-        Console.WriteLine($"Payment Amount: {request.PaymentAmount:C}");
-
-        if (request.PaymentDate != default)
-            Console.WriteLine($"Payment Date: {request.PaymentDate:yyyy-MM-dd}");
+        Console.WriteLine($"Game ID: {request.GameId}");
 
         if (request.Status.HasValue)
             Console.WriteLine($"Payment Status: {request.Status.Value}");

@@ -73,9 +73,9 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
 
                     var request = new SendPaymentProcessedEmailRequest
                     {
-                        Email = $"user-{paymentProcessedEvent.UserId}@fiap.com",
-                        Name = $"User {paymentProcessedEvent.UserId}",
-                        PaymentDate = DateTime.UtcNow,
+                        UserId = paymentProcessedEvent.UserId,
+                        GameId = paymentProcessedEvent.GameId,
+                        CorrelationId = paymentProcessedEvent.CorrelationId,
                         Status = Domain.Enums.PaymentStatus.Approved
                     };
 
