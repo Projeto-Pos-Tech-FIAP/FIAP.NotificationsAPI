@@ -4,23 +4,43 @@ services:
     container_name: fiap-kafka
     ports:
       - "9092:9092"
+      - "9094:9094"
     environment:
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: "broker,controller"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
 
-      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      # Listener TUNNEL (9094): exclusivo para o túnel ngrok que a Lambda usa via
+      # self-managed Kafka trigger. SASL_SSL (autenticado + criptografado) porque
+      # a AWS Lambda exige TLS pra brokers acessíveis pela internet pública; os
+      # demais listeners (usados por PaymentsAPI/UsersAPI/CatalogAPI) continuam
+      # PLAINTEXT, sem alteração.
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093,TUNNEL://0.0.0.0:9094"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092,TUNNEL://${TUNNEL_ADVERTISED_ADDRESS:-localhost:9094}"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,TUNNEL:SASL_SSL"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
+      KAFKA_LISTENER_NAME_TUNNEL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="lambda" password="${KAFKA_TUNNEL_SASL_PASSWORD:-kafka-tunnel-default-pass}" user_lambda="${KAFKA_TUNNEL_SASL_PASSWORD:-kafka-tunnel-default-pass}";'
+      KAFKA_LISTENER_NAME_TUNNEL_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/kafka.keystore.p12
+      KAFKA_LISTENER_NAME_TUNNEL_SSL_KEYSTORE_PASSWORD: "${KAFKA_TUNNEL_KEYSTORE_PASSWORD:-kafka-tunnel-default-pass}"
+      KAFKA_LISTENER_NAME_TUNNEL_SSL_KEY_PASSWORD: "${KAFKA_TUNNEL_KEYSTORE_PASSWORD:-kafka-tunnel-default-pass}"
+      KAFKA_LISTENER_NAME_TUNNEL_SSL_KEYSTORE_TYPE: PKCS12
+      KAFKA_LISTENER_NAME_TUNNEL_SSL_CLIENT_AUTH: none
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      # Sem .env / sem certificado gerado: usa o keystore "de mentira" versionado
+      # em kafka-certs-default/, só pra o Kafka subir normal (o listener TUNNEL
+      # fica inerte, ninguém consegue autenticar nele). Quem for usar a Lambda de
+      # verdade roda ./generate-kafka-tunnel-certs.sh e define KAFKA_CERTS_DIR=./kafka-certs
+      # no seu .env, apontando pro certificado real (gitignored).
+      - ${KAFKA_CERTS_DIR:-./kafka-certs-default}:/etc/kafka/secrets
     networks:
       - fiap-network
 

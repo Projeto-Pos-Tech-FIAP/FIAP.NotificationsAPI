@@ -213,3 +213,122 @@ dotnet build FIAP.NotificationsAPI.slnx
 dotnet test FIAP.NotificationsAPI.slnx
 dotnet run --project src/FIAP.NotificationsAPI.Api/FIAP.NotificationsAPI.Api.csproj
 ```
+
+## Migracao serverless (AWS Lambda + Kafka trigger)
+
+Alem da API tradicional, o consumo dos topicos `user-created` e `payment-processed`
+foi migrado para uma AWS Lambda (`src/FIAP.NotificationsAPI.Lambda`), acionada
+diretamente pelo Kafka via *self-managed Kafka event source mapping*. O Kafka
+continua sendo o mesmo (mesmos topicos, mesmo broker) — so muda quem consome.
+
+Como o Kafka roda localmente (Docker), e a Lambda roda na AWS, a conexao entre
+os dois se da por um tunel TCP (ngrok), autenticado com SASL/PLAIN e
+criptografado com TLS (a AWS exige TLS para brokers self-managed acessiveis
+pela internet publica).
+
+**Cada pessoa que for rodar isso precisa gerar os proprios certificados e usar
+o proprio tunel** — nao da pra reaproveitar os de outra pessoa, ja que o
+endereco do tunel muda a cada sessao do ngrok.
+
+> Se voce so vai desenvolver/testar as outras APIs (Catalog/Users/Payment) e
+> nao vai mexer na Lambda: **pode pular esta secao inteira**. `cp .env.example .env`
+> e `docker compose up -d` ja sobem o Kafka normalmente, usando um certificado
+> de exemplo versionado em `kafka-certs-default/` — o listener `TUNNEL` fica
+> la, so inerte (ninguem consegue autenticar nele), sem afetar os outros
+> listeners que Payments/Users/Catalog usam.
+
+### Pre-requisitos
+
+- Conta AWS (com um usuario IAM proprio, nao a conta root) e AWS CLI configurado
+  (`aws configure`) — **nunca** compartilhe suas chaves de acesso com outra
+  pessoa nem as coloque em arquivos versionados.
+- [ngrok](https://ngrok.com) instalado e com conta (o plano gratuito hoje exige
+  cadastro de cartao so para verificacao, sem cobranca, para liberar tuneis TCP).
+- `dotnet tool install -g Amazon.Lambda.Tools`.
+- OpenSSL (ja vem instalado no macOS/Linux).
+
+### Passo a passo
+
+1. **Suba o Kafka** (veja secao "Como executar" acima).
+
+2. **Abra o tunel** num terminal que vai ficar aberto durante todo o uso:
+   ```bash
+   ngrok tcp 9094
+   ```
+   Anote o endereco que aparecer em `Forwarding` (ex: `0.tcp.sa.ngrok.io:16275`).
+
+3. **Gere os certificados** do listener `TUNNEL`, passando so o host (sem porta):
+   ```bash
+   ./generate-kafka-tunnel-certs.sh 0.tcp.sa.ngrok.io
+   ```
+   O script gera tudo em `kafka-certs/` (gitignored) e imprime os valores que
+   voce precisa colar no `.env`.
+
+4. **Crie o `.env`** a partir do `.env.example`, com o endereco completo
+   (host:porta) do passo 2 e as senhas impressas no passo 3:
+   ```bash
+   cp .env.example .env
+   ```
+
+5. **Reinicie o Kafka** para aplicar a config nova:
+   ```bash
+   docker compose up -d --force-recreate kafka
+   ```
+
+6. **Deploy da Lambda**:
+   ```bash
+   cd src/FIAP.NotificationsAPI.Lambda
+
+   # cria a IAM Role de execucao (uma vez so)
+   aws iam create-role --role-name notifications-lambda-execution-role \
+     --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+   aws iam attach-role-policy --role-name notifications-lambda-execution-role \
+     --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+   # ajuste aws-lambda-tools-defaults.json: profile, region e function-role
+   # (o ARN da role criada acima) antes de rodar o deploy
+   dotnet lambda deploy-function
+   ```
+
+7. **Guarde as credenciais do Kafka no Secrets Manager** (usadas pela Lambda
+   pra autenticar no broker):
+   ```bash
+   aws secretsmanager create-secret --name notifications-lambda/kafka-tunnel-creds \
+     --secret-string '{"username":"lambda","password":"<KAFKA_TUNNEL_SASL_PASSWORD do seu .env>"}'
+
+   aws secretsmanager create-secret --name notifications-lambda/kafka-tunnel-ca-cert \
+     --secret-string "{\"certificate\": \"$(cat kafka-certs/ca-cert.pem)\"}"
+
+   # de permissao pra Role ler os dois segredos acima (troque os ARNs)
+   aws iam put-role-policy --role-name notifications-lambda-execution-role \
+     --policy-name read-kafka-tunnel-secret \
+     --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":["<ARN-creds>","<ARN-ca-cert>"]}]}'
+   ```
+
+8. **Crie os dois Event Source Mappings** (um por topico — a AWS so aceita um
+   topico por mapping para Kafka):
+   ```bash
+   aws lambda create-event-source-mapping --function-name FIAP-NotificationsLambda \
+     --topics user-created --starting-position TRIM_HORIZON \
+     --self-managed-event-source '{"Endpoints":{"KAFKA_BOOTSTRAP_SERVERS":["<host:porta do tunel>"]}}' \
+     --source-access-configurations Type=BASIC_AUTH,URI=<ARN-creds> Type=SERVER_ROOT_CA_CERTIFICATE,URI=<ARN-ca-cert>
+
+   aws lambda create-event-source-mapping --function-name FIAP-NotificationsLambda \
+     --topics payment-processed --starting-position TRIM_HORIZON \
+     --self-managed-event-source '{"Endpoints":{"KAFKA_BOOTSTRAP_SERVERS":["<host:porta do tunel>"]}}' \
+     --source-access-configurations Type=BASIC_AUTH,URI=<ARN-creds> Type=SERVER_ROOT_CA_CERTIFICATE,URI=<ARN-ca-cert>
+   ```
+
+9. **Teste**: publique uma mensagem no topico e acompanhe o CloudWatch Logs:
+   ```bash
+   docker exec -i fiap-kafka kafka-console-producer --bootstrap-server 0.0.0.0:9092 --topic user-created <<< '{"name":"Teste","email":"teste@fiap.com.br"}'
+   aws logs tail /aws/lambda/FIAP-NotificationsLambda --since 2m
+   ```
+
+Se algum dia o processo do `ngrok` cair, o endereco do tunel muda — repita os
+passos 2 a 8 (o Kafka e a Lambda continuam existindo, so precisa apontar os
+dois pro endereco novo).
+
+**Nao rode a `FIAP.NotificationsAPI.Api` (com os `BackgroundService`) ao mesmo
+tempo que a Lambda** — os dois vao consumir os mesmos topicos em paralelo
+(grupos de consumidor diferentes), duplicando o "envio" de e-mail simulado.
