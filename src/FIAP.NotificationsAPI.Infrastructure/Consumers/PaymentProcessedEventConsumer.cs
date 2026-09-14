@@ -28,6 +28,8 @@ namespace FIAP.NotificationsAPI.Infrastructure.Consumers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            await Task.Yield();
+
             var config = new ConsumerConfig
             {
                 BootstrapServers = _kafkaSettings.BootstrapServers,

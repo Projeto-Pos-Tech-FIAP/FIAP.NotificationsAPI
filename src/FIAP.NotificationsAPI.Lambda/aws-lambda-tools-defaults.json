@@ -14,5 +14,5 @@
   "function-timeout": 30,
   "function-handler": "FIAP.NotificationsAPI.Lambda::FIAP.NotificationsAPI.Lambda.Function::FunctionHandler",
   "function-name": "FIAP-NotificationsLambda",
-  "function-role": "arn:aws:iam::465657201187:role/notifications-lambda-execution-role"
+  "function-role": "arn:aws:iam::654639801295:role/notifications-lambda-execution-role"
 }

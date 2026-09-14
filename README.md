@@ -185,6 +185,7 @@ Payload esperado:
 - O Swagger e habilitado somente em ambiente `Development`.
 - O consumidor de pagamento ignora notificacoes quando o status do pagamento nao e `Approved`.
 - Os consumidores Kafka estao implementados no projeto `FIAP.NotificationsAPI.Infrastructure` e registrados no `Program.cs` via `AddInfrastructure(builder.Configuration)`.
+- Os consumidores sao `BackgroundService` e comecam o `ExecuteAsync` com `await Task.Yield()`. A chamada e obrigatoria: `consumer.Consume(stoppingToken)` bloqueia a thread, e sem devolver o controle ao host antes do laco o `StartAsync` nunca retorna, o Kestrel nao faz bind e a API sobe sem servidor HTTP. O sintoma so aparece quando o topico ja existe e esta vazio, ou seja, em todo restart posterior ao primeiro evento publicado.
 
 ## Contratos principais
 
@@ -286,6 +287,8 @@ endereco do tunel muda a cada sessao do ngrok.
      --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
    # ajuste aws-lambda-tools-defaults.json: profile, region e function-role
+   # (o function-role versionado aponta para a conta de quem publicou primeiro —
+   #  troque pelo ARN da role criada acima na SUA conta, senao o deploy falha)
    # (o ARN da role criada acima) antes de rodar o deploy
    dotnet lambda deploy-function
    ```
