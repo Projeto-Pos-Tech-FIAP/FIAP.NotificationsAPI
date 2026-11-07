@@ -1,0 +1,68 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+  actions: read
+
+jobs:
+  pipeline:
+    uses: Projeto-Pos-Tech-FIAP/FIAP.Orchestration/.github/workflows/dotnet-service.yml@main
+    with:
+      solution: FIAP.NotificationsAPI.slnx
+      service-name: notifications-api
+    secrets:
+      ORCHESTRATION_TOKEN: ${{ secrets.ORCHESTRATION_TOKEN }}
+
+  deploy-lambda:
+    name: Deploy AWS Lambda
+    needs: pipeline
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_LAMBDA == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Amazon.Lambda.Tools
+        run: dotnet tool install -g Amazon.Lambda.Tools
+
+      - name: Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::Secrets AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY não configurados"
+            exit 1
+          fi
+          mkdir -p ~/.aws
+          printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+          chmod 600 ~/.aws/credentials
+
+      - name: Deploy function
+        working-directory: src/FIAP.NotificationsAPI.Lambda
+        run: dotnet lambda deploy-function --region "${{ vars.AWS_REGION || 'sa-east-1' }}" --disable-interactive true
