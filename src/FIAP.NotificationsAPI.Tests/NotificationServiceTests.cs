@@ -1,5 +1,6 @@
 using FIAP.NotificationsAPI.Application.DTOs.Requests;
 using FIAP.NotificationsAPI.Application.Services;
+using FIAP.NotificationsAPI.Domain.Enums;
 
 namespace FIAP.NotificationsAPI.Tests;
 
@@ -27,11 +28,10 @@ public class NotificationServiceTests
         var service = new NotificationService();
         var request = new SendPaymentProcessedEmailRequest
         {
-            Email = "player@fiap.com.br",
-            Name = "Player One",
-            OrderId = 123,
-            PaymentAmount = 99.90m,
-            PaymentDate = new DateTime(2026, 6, 13)
+            UserId = Guid.NewGuid(),
+            GameId = 123,
+            CorrelationId = "order-123",
+            Status = PaymentStatus.Approved
         };
 
         var response = await service.SendPaymentProcessedEmailAsync(request);
