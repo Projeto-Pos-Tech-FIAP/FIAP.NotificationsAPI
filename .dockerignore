@@ -1,0 +1,11 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/*.user
+**/TestResults
+**/node_modules
+**/.env
+.github
+kafka-certs
